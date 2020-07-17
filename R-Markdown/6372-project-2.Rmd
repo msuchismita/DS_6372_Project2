@@ -1,0 +1,67 @@
+---
+title: "6372-project-2"
+author: "Hollie"
+date: "7/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(naniar)
+library(imputeTS)
+
+```
+
+```{r}
+#Missing data? 
+vis_miss(bank.additional.full)
+```
+
+```{r}
+#summary of dataset
+summary(bank.additional.full)
+```
+
+```{r}
+#boxplot of y versus age
+bank.additional.full %>% ggplot(aes(x = y, y=age)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by Age") + ylab("Age")
+```
+
+```{r}
+#boxplot of contact versus age
+bank.additional.full %>% ggplot(aes(x = contact, y=age)) + geom_boxplot(fill="red") + labs(title = "Contact by Age") + ylab("Age")
+
+```
+
+```{r}
+#scatterplot of age vs. 
+bank.additional.full %>% ggplot(aes(x=age, y=campaign, color=y)) + geom_point()
+```
+
+```{r}
+# Education Stacked Bar Plot
+counts <- table(bank.additional.full$y, bank.additional.full$education)
+barplot(counts, main="Term Deposits by Education",
+        xlab="Type of Education", col=c("darkblue","red"),
+        legend = rownames(counts))
+```
+
+```{r}
+# Month Stacked Bar Plot
+counts <- table(bank.additional.full$y, bank.additional.full$month)
+barplot(counts, main="Term Deposits by Month",
+        xlab="Last Month Contacted", col=c("darkblue","red"),
+        legend = rownames(counts))
+
+# Day of the Week Contacted Stacked Bar Plot
+counts <- table(bank.additional.full$y, bank.additional.full$day_of_week)
+barplot(counts, main="Term Deposits by Day of the Week",
+        xlab="Type of Education", col=c("darkblue","red"),
+        legend = rownames(counts))
+```
+
