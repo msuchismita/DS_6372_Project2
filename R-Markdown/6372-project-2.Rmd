@@ -1,21 +1,40 @@
 ---
 title: "6372-project-2"
-author: "Hollie"
+author: "Hollie, Kenny, Suchi"
 date: "7/12/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(gplots)
 library(ggplot2)
 library(tidyverse)
 library(naniar)
 library(imputeTS)
-
 ```
+
+```{r}
+# Reading datafile
+        bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
+        bank.additional.full <- as.data.frame(bank.additional.full)
+        bank.additional.full$y <- as.factor(bank.additional.full$y)
+
+# Separating out yes and no observations
+        bank.additional.yes <- bank.additional.full %>% filter (y=='yes')
+        bank.additional.no <- bank.additional.full %>% filter (y=='no')
+
+ # Picking 1000 sample each from yes and no
+        summary(bank.additional.full$y)
+        index.no<-sample(1:36548,1000,replace=FALSE)
+        index.yes<-sample(1:4640,1000,replace=FALSE)
+
+        bank.additional.sample.no<-bank.additional.full[index.no,]
+        bank.additional.sample.yes<-bank.additional.full[index.yes,]
+        
+        bank.additional.sample <- rbind(bank.additional.sample.no,bank.additional.sample.yes)
+```
+
 
 ```{r}
 #Missing data? 
@@ -63,5 +82,68 @@ counts <- table(bank.additional.full$y, bank.additional.full$day_of_week)
 barplot(counts, main="Term Deposits by Day of the Week",
         xlab="Type of Education", col=c("darkblue","red"),
         legend = rownames(counts))
+```
+
+
+
+```{r}
+#Visualize Categorical predictors
+set.seed(1234)
+index<-sample(1:2000,1500,replace=FALSE)
+test<-bank.additional.sample[-index,]
+bank.additional.sample<-bank.additional.sample[index,]
+
+attach(bank.additional.sample)
+#Table of counts are helpful for categorcal predictors
+ftable(addmargins(table(y,job))) 
+ftable(addmargins(table(y,marital))) 
+ftable(addmargins(table(y,education))) 
+ftable(addmargins(table(y,default))) 
+ftable(addmargins(table(y,housing))) 
+ftable(addmargins(table(y,loan))) 
+ftable(addmargins(table(y,contact))) 
+ftable(addmargins(table(y,month))) 
+ftable(addmargins(table(y,day_of_week))) 
+ftable(addmargins(table(y,poutcome))) 
+
+
+#to get proportions that make sense
+prop.table(table(y,job),2)
+prop.table(table(y,marital),2)
+prop.table(table(y,education),2)
+prop.table(table(y,default),2)
+prop.table(table(y,housing),2)
+prop.table(table(y,loan),2)
+prop.table(table(y,contact),2)
+prop.table(table(y,month),2)
+prop.table(table(y,day_of_week),2)
+prop.table(table(y,poutcome),2)
+
+```
+
+
+```{r}
+#PCA among the continous predictors 
+
+pairs(bank.additional.sample[,c(1,11:14,16:20)])
+pairs(bank.additional.sample[,c(1,11:14,16:20)],col=bank.additional.sample$y)
+my.cor<-cor(bank.additional.sample[,c(1,11:14,16:20)])
+
+heatmap.2(my.cor,col=redgreen(75), 
+          density.info="none", trace="none", dendrogram=c("both"), 
+          symm=F,symkey=T,symbreaks=T, scale="none",key=T)
+
+
+pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:20)],scale.=TRUE)
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-bank.additional.sample$y
+
+
+eigenvals<-(pc.result$sdev)^2
+plot(1:10,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
+lines(1:10,cumulative.prop,lty=2)
+
 ```
 
