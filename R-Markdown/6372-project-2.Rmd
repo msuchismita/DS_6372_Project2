@@ -6,31 +6,52 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+#knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(gplots)
 library(ggplot2)
 library(tidyverse)
 library(naniar)
 library(imputeTS)
+library(plyr)
+library(readr)
+library(dplyr)
+library(MASS)
 ```
+
 
 ```{r}
 # Reading datafile
-        bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
-        bank.additional.full <- as.data.frame(bank.additional.full)
+        #bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
+        bank.additional.full <- read_csv2("../Data/bank-additional-full.csv", quote = "\"",col_names = TRUE, trim_ws = TRUE)
+
+#removing nr.employed column as it has values only as NAs and 5191
+        bank.additional.full <- bank.additional.full[(-c(20))]
+
+#Converting the categorical variables as factors
         bank.additional.full$y <- as.factor(bank.additional.full$y)
+        bank.additional.full$job <- as.factor(bank.additional.full$job)
+        bank.additional.full$marital <- as.factor(bank.additional.full$marital)
+        bank.additional.full$education <- as.factor(bank.additional.full$education)
+        bank.additional.full$default <- as.factor(bank.additional.full$default)
+        bank.additional.full$housing <- as.factor(bank.additional.full$housing)
+        bank.additional.full$loan <- as.factor(bank.additional.full$loan)
+        bank.additional.full$contact <- as.factor(bank.additional.full$contact)
+        bank.additional.full$day_of_week <- as.factor(bank.additional.full$day_of_week)
+        bank.additional.full$poutcome <- as.factor(bank.additional.full$poutcome)
+        bank.additional.full$month <- as.factor(bank.additional.full$month)
 
 # Separating out yes and no observations
-        bank.additional.yes <- bank.additional.full %>% filter (y=='yes')
         bank.additional.no <- bank.additional.full %>% filter (y=='no')
+        bank.additional.yes <- bank.additional.full %>% filter (y=='yes')
 
  # Picking 1000 sample each from yes and no
-        summary(bank.additional.full$y)
-        index.no<-sample(1:36548,1000,replace=FALSE)
-        index.yes<-sample(1:4640,1000,replace=FALSE)
+        set.seed(1234)
+        index.no<-sample(1:nrow(bank.additional.no),1000,replace=FALSE)
+        index.yes<-sample(1:nrow(bank.additional.yes),1000,replace=FALSE)
 
-        bank.additional.sample.no<-bank.additional.full[index.no,]
-        bank.additional.sample.yes<-bank.additional.full[index.yes,]
+        bank.additional.sample.no<-bank.additional.no[index.no,]
+        bank.additional.sample.yes<-bank.additional.yes[index.yes,]
         
         bank.additional.sample <- rbind(bank.additional.sample.no,bank.additional.sample.yes)
 ```
@@ -41,15 +62,18 @@ library(imputeTS)
 vis_miss(bank.additional.full)
 ```
 
+
 ```{r}
 #summary of dataset
 summary(bank.additional.full)
 ```
 
+
 ```{r}
 #boxplot of y versus age
 bank.additional.full %>% ggplot(aes(x = y, y=age)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by Age") + ylab("Age")
 ```
+
 
 ```{r}
 #boxplot of contact versus age
@@ -57,10 +81,12 @@ bank.additional.full %>% ggplot(aes(x = contact, y=age)) + geom_boxplot(fill="re
 
 ```
 
+
 ```{r}
 #scatterplot of age vs. 
 bank.additional.full %>% ggplot(aes(x=age, y=campaign, color=y)) + geom_point()
 ```
+
 
 ```{r}
 # Education Stacked Bar Plot
@@ -69,6 +95,7 @@ barplot(counts, main="Term Deposits by Education",
         xlab="Type of Education", col=c("darkblue","red"),
         legend = rownames(counts))
 ```
+
 
 ```{r}
 # Month Stacked Bar Plot
@@ -83,7 +110,6 @@ barplot(counts, main="Term Deposits by Day of the Week",
         xlab="Type of Education", col=c("darkblue","red"),
         legend = rownames(counts))
 ```
-
 
 
 ```{r}
@@ -108,6 +134,7 @@ ftable(addmargins(table(y,poutcome)))
 
 
 #to get proportions that make sense
+
 prop.table(table(y,job),2)
 prop.table(table(y,marital),2)
 prop.table(table(y,education),2)
@@ -125,25 +152,40 @@ prop.table(table(y,poutcome),2)
 ```{r}
 #PCA among the continous predictors 
 
-pairs(bank.additional.sample[,c(1,11:14,16:20)])
-pairs(bank.additional.sample[,c(1,11:14,16:20)],col=bank.additional.sample$y)
-my.cor<-cor(bank.additional.sample[,c(1,11:14,16:20)])
+pairs(bank.additional.sample[,c(1,11:14,16:19)])
+pairs(bank.additional.sample[,c(1,11:14,16:19)],col=bank.additional.sample$y)
+my.cor<-cor(bank.additional.sample[,c(1,11:14,16:19)])
 
 heatmap.2(my.cor,col=redgreen(75), 
           density.info="none", trace="none", dendrogram=c("both"), 
           symm=F,symkey=T,symbreaks=T, scale="none",key=T)
 
 
-pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:20)],scale.=TRUE)
+pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:19)],scale.=TRUE)
 pc.scores<-pc.result$x
 pc.scores<-data.frame(pc.scores)
 pc.scores$y<-bank.additional.sample$y
 
 
 eigenvals<-(pc.result$sdev)^2
-plot(1:10,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+plot(1:9,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
 cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-lines(1:10,cumulative.prop,lty=2)
+lines(1:9,cumulative.prop,lty=2)
 
 ```
+
+
+```{r}
+simple.log<-glm(y~.,family="binomial",data=bank.additional.sample)
+summary(simple.log)
+```
+
+
+```{r}
+full.log<-glm(y~.,family="binomial",data=bank.additional.sample)
+step.log<-full.log %>% stepAIC(trace=FALSE)
+summary(step.log)
+exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
+```
+
 
