@@ -1,5 +1,5 @@
 ---
-title: "6372-project-2"
+title: "DS 6372 Project 2"
 author: "Hollie, Kenny, Suchi"
 date: "7/12/2020"
 output: html_document
@@ -22,12 +22,17 @@ library(MASS)
 
 ```{r}
 # Reading datafile
-        #bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
-        bank.additional.full <- read_csv2("../Data/bank-additional-full.csv", quote = "\"",col_names = TRUE, trim_ws = TRUE)
+        bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
+```
 
-#removing nr.employed column as it has values only as NAs and 5191
-        bank.additional.full <- bank.additional.full[(-c(20))]
 
+```{r}
+#Missing data? 
+        vis_miss(bank.additional.full)
+```
+
+
+```{r}
 #Converting the categorical variables as factors
         bank.additional.full$y <- as.factor(bank.additional.full$y)
         bank.additional.full$job <- as.factor(bank.additional.full$job)
@@ -58,39 +63,30 @@ library(MASS)
 
 
 ```{r}
-#Missing data? 
-vis_miss(bank.additional.full)
-```
-
-
-```{r}
 #summary of dataset
-summary(bank.additional.full)
+        summary(bank.additional.full)
 ```
 
 
 ```{r}
-#boxplot of y versus age
-bank.additional.full %>% ggplot(aes(x = y, y=age)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by Age") + ylab("Age")
+#boxplot of response variable (y) versus all other continous variables
+        bank.additional.sample %>% ggplot(aes(x = y, y=age)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by Age") + ylab("Age")
+        bank.additional.sample %>% ggplot(aes(x = y, y=duration)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by duration") + ylab("duration")
+        bank.additional.sample %>% ggplot(aes(x = y, y=campaign)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by campaign") + ylab("campaign")
+        bank.additional.sample %>% ggplot(aes(x = y, y=pdays)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success") + ylab("Days after last contact")
+        bank.additional.sample %>% ggplot(aes(x = y, y=previous)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("Number of contacts done before")
+        bank.additional.sample %>% ggplot(aes(x = y, y=emp.var.rate  )) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("employment variation rate - quarterly indicator")
+        bank.additional.sample %>% ggplot(aes(x = y, y=cons.price.idx)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("consumer price index - monthly indicator")
+        bank.additional.sample %>% ggplot(aes(x = y, y=cons.conf.idx)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("consumer confidence index - monthly indicator")
+        bank.additional.sample %>% ggplot(aes(x = y, y=euribor3m)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success") + ylab("euribor 3 month rate - daily indicator")
+        bank.additional.sample %>% ggplot(aes(x = y, y=nr.employed)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("number of employees - quarterly indicator")
 ```
 
-
-```{r}
-#boxplot of contact versus age
-bank.additional.full %>% ggplot(aes(x = contact, y=age)) + geom_boxplot(fill="red") + labs(title = "Contact by Age") + ylab("Age")
-
-```
-
-
-```{r}
-#scatterplot of age vs. 
-bank.additional.full %>% ggplot(aes(x=age, y=campaign, color=y)) + geom_point()
-```
 
 
 ```{r}
 # Education Stacked Bar Plot
-counts <- table(bank.additional.full$y, bank.additional.full$education)
+counts <- table(bank.additional.sample$y, bank.additional.sample$education)
 barplot(counts, main="Term Deposits by Education",
         xlab="Type of Education", col=c("darkblue","red"),
         legend = rownames(counts))
@@ -99,13 +95,13 @@ barplot(counts, main="Term Deposits by Education",
 
 ```{r}
 # Month Stacked Bar Plot
-counts <- table(bank.additional.full$y, bank.additional.full$month)
+counts <- table(bank.additional.sample$y, bank.additional.sample$month)
 barplot(counts, main="Term Deposits by Month",
         xlab="Last Month Contacted", col=c("darkblue","red"),
         legend = rownames(counts))
 
 # Day of the Week Contacted Stacked Bar Plot
-counts <- table(bank.additional.full$y, bank.additional.full$day_of_week)
+counts <- table(bank.additional.sample$y, bank.additional.sample$day_of_week)
 barplot(counts, main="Term Deposits by Day of the Week",
         xlab="Type of Education", col=c("darkblue","red"),
         legend = rownames(counts))
@@ -114,37 +110,36 @@ barplot(counts, main="Term Deposits by Day of the Week",
 
 ```{r}
 #Visualize Categorical predictors
-set.seed(1234)
-index<-sample(1:2000,1500,replace=FALSE)
-test<-bank.additional.sample[-index,]
-bank.additional.sample<-bank.additional.sample[index,]
-
-attach(bank.additional.sample)
+        set.seed(1234)
+        index<-sample(1:2000,1500,replace=FALSE)
+        test<-bank.additional.sample[-index,]
+        bank.additional.sample<-bank.additional.sample[index,]
+        
+        attach(bank.additional.sample)
 #Table of counts are helpful for categorcal predictors
-ftable(addmargins(table(y,job))) 
-ftable(addmargins(table(y,marital))) 
-ftable(addmargins(table(y,education))) 
-ftable(addmargins(table(y,default))) 
-ftable(addmargins(table(y,housing))) 
-ftable(addmargins(table(y,loan))) 
-ftable(addmargins(table(y,contact))) 
-ftable(addmargins(table(y,month))) 
-ftable(addmargins(table(y,day_of_week))) 
-ftable(addmargins(table(y,poutcome))) 
-
+        ftable(addmargins(table(y,job))) 
+        ftable(addmargins(table(y,marital)))
+        #xtabs(~y+marital,data=bank.additional.sample)
+        ftable(addmargins(table(y,education))) 
+        ftable(addmargins(table(y,default))) 
+        ftable(addmargins(table(y,housing))) 
+        ftable(addmargins(table(y,loan))) 
+        ftable(addmargins(table(y,contact))) 
+        ftable(addmargins(table(y,month))) 
+        ftable(addmargins(table(y,day_of_week))) 
+        ftable(addmargins(table(y,poutcome))) 
 
 #to get proportions that make sense
-
-prop.table(table(y,job),2)
-prop.table(table(y,marital),2)
-prop.table(table(y,education),2)
-prop.table(table(y,default),2)
-prop.table(table(y,housing),2)
-prop.table(table(y,loan),2)
-prop.table(table(y,contact),2)
-prop.table(table(y,month),2)
-prop.table(table(y,day_of_week),2)
-prop.table(table(y,poutcome),2)
+        prop.table(table(y,job),2)
+        prop.table(table(y,marital),2)
+        prop.table(table(y,education),2)
+        prop.table(table(y,default),2)
+        prop.table(table(y,housing),2)
+        prop.table(table(y,loan),2)
+        prop.table(table(y,contact),2)
+        prop.table(table(y,month),2)
+        prop.table(table(y,day_of_week),2)
+        prop.table(table(y,poutcome),2)
 
 ```
 
@@ -152,40 +147,50 @@ prop.table(table(y,poutcome),2)
 ```{r}
 #PCA among the continous predictors 
 
-pairs(bank.additional.sample[,c(1,11:14,16:19)])
-pairs(bank.additional.sample[,c(1,11:14,16:19)],col=bank.additional.sample$y)
-my.cor<-cor(bank.additional.sample[,c(1,11:14,16:19)])
-
-heatmap.2(my.cor,col=redgreen(75), 
-          density.info="none", trace="none", dendrogram=c("both"), 
-          symm=F,symkey=T,symbreaks=T, scale="none",key=T)
-
-
-pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:19)],scale.=TRUE)
-pc.scores<-pc.result$x
-pc.scores<-data.frame(pc.scores)
-pc.scores$y<-bank.additional.sample$y
-
-
-eigenvals<-(pc.result$sdev)^2
-plot(1:9,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
-cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-lines(1:9,cumulative.prop,lty=2)
+#        pairs(bank.additional.sample[,c(1,11:14,16:19)])
+#        pairs(bank.additional.sample[,c(1,11:14,16:19)],col=bank.additional.sample$y)
+#        my.cor<-cor(bank.additional.sample[,c(1,11:14,16:19)])
+        
+#        heatmap.2(my.cor,col=redgreen(75), 
+#                  density.info="none", trace="none", dendrogram=c("both"), 
+#                  symm=F,symkey=T,symbreaks=T, scale="none",key=T)
+        
+        
+#        pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:19)],scale.=TRUE)
+#        pc.scores<-pc.result$x
+#        pc.scores<-data.frame(pc.scores)
+#        pc.scores$y<-bank.additional.sample$y
+        
+        
+#        eigenvals<-(pc.result$sdev)^2
+#        plot(1:9,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+#        cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
+#        lines(1:9,cumulative.prop,lty=2)
 
 ```
 
 
 ```{r}
-simple.log<-glm(y~.,family="binomial",data=bank.additional.sample)
-summary(simple.log)
+#fitting a simple model by using only 3 predictors which appered to be significant in EDA
+        simple.logistics<-glm(y~emp.var.rate + euribor3m+cons.price.idx, family="binomial",data=bank.additional.sample)
+        summary(simple.logistics)
 ```
 
 
 ```{r}
-full.log<-glm(y~.,family="binomial",data=bank.additional.sample)
-step.log<-full.log %>% stepAIC(trace=FALSE)
-summary(step.log)
-exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
+#fitting a complex model by using all variables
+        simple.log<-glm(y~.,family="binomial",data=bank.additional.sample)
+        summary(simple.log)
 ```
+
+
+```{r}
+#fitting a complex model by using all variables and using stepwise selection
+        full.log<-glm(y~.,family="binomial",data=bank.additional.sample)
+        step.log<-full.log %>% stepAIC(trace=FALSE)
+        summary(step.log)
+        exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
+```
+
 
 
