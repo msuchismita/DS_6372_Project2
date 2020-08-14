@@ -101,10 +101,20 @@ library(ROCR)
         bank.additional.sample %>% ggplot(aes(x = y, y=nr.employed)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success ") + ylab("number of employees - quarterly indicator")
 ```
 
+<<<<<<< HEAD
 
 ```{r}
 #Visualize Categorical variables
 #Table of counts are helpful for categorical variables
+=======
+```{r}
+#Visualize Categorical predictors
+        set.seed(1234)
+        index<-sample(1:2000,1500,replace=FALSE)
+        test<-bank.additional.sample[-index,]
+        bank.additional.sample<-bank.additional.sample[index,]
+        
+>>>>>>> c3bf7fe1b3e400caa4769a50e12984539bda5f05
         attach(bank.additional.sample)
         ftable(addmargins(table(y,job))) 
         ftable(addmargins(table(y,marital)))
@@ -152,8 +162,13 @@ library(ROCR)
 
 
 ```{r}
+<<<<<<< HEAD
 #fitting a simple model by using only 5 predictors which appeared to be significant in EDA (Suchi)
         simple.logistics<-glm(y~emp.var.rate + euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample)
+=======
+#fitting a simple model by using only 4 predictors which appeared to be significant in EDA
+        simple.logistics<-glm(y~euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample)
+>>>>>>> c3bf7fe1b3e400caa4769a50e12984539bda5f05
         summary(simple.logistics)
         confint(simple.logistics)
 ```
@@ -320,6 +335,71 @@ library(ROCR)
       MeanAcc = colMeans(masterAcc)
       
       plot(seq(1,numks,1),MeanAcc, type = "l")
+```
+
+```{r}
+#packages for knn
+library("e1071")
+library("caret")
+library("class")
+
+
+#Cross Validation
+set.seed(123)
+splitPerc = .75
+
+trainIndices = sample(1:dim(bank.additional.sample)[1],round(splitPerc * dim(bank.additional.sample)[1]))
+train = bank.additional.sample[trainIndices,]
+test = bank.additional.sample[-trainIndices,]
+
+## Loop for many k and one training / test partition
+
+accs = data.frame(accuracy = numeric(50), k = numeric(50))
+
+for(i in 1:50)
+{
+  classifications = knn(train[,c(17,19)],test[,c(17,19)],train$y, prob = TRUE, k = i)
+  table(test$y,classifications)
+  CM = confusionMatrix(table(test$y,classifications))
+  accs$accuracy[i] = CM$overall[1]
+  accs$k[i] = i
+}
+
+plot(accs$k,accs$accuracy, type = "l", xlab = "k")
+
+iterations = 500
+numks = 50
+
+masterAcc = matrix(nrow = iterations, ncol = numks)
+
+for(j in 1:iterations)
+{
+  accs = data.frame(accuracy = numeric(50), k = numeric(50))
+  trainIndices = sample(1:dim(bank.additional.sample)[1],round(splitPerc * dim(bank.additional.sample)[1]))
+  train = bank.additional.sample[trainIndices,]
+  test = bank.additional.sample[-trainIndices,]
+  for(i in 1:numks)
+  {
+    classifications = knn(train[,c(17,19)],test[,c(17,19)],train$y, prob = TRUE, k = i)
+    table(classifications,test$y)
+    CM = confusionMatrix(table(classifications,test$y))
+    masterAcc[j,i] = CM$overall[1]
+  }
+  
+}
+MeanAcc = colMeans(masterAcc)
+
+plot(seq(1,numks,1),MeanAcc, type = "l")
+
+# k = 32
+classifications = knn(train[,c(17,19)],test[,c(17,19)],train$y, prob = TRUE, k = 32)
+table(test$y,classifications)
+confusionMatrix(table(test$y,classifications))
+
+CM = confusionMatrix(table(test$y,classifications))
+CM$overall[1]
+
+
 ```
 
 
