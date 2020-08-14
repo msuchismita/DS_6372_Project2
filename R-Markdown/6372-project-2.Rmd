@@ -17,6 +17,13 @@ library(plyr)
 library(readr)
 library(dplyr)
 library(MASS)
+library(GGally)
+library(randomForest)
+library(lda)
+library(e1071)
+library(caret)
+library(class)
+library(ROCR)
 ```
 
 
@@ -33,6 +40,8 @@ library(MASS)
 
 
 ```{r}
+## TRANSFORMING DATA
+
 #Converting the categorical variables as factors
         bank.additional.full$y <- as.factor(bank.additional.full$y)
         bank.additional.full$job <- as.factor(bank.additional.full$job)
@@ -51,7 +60,7 @@ library(MASS)
         bank.additional.yes <- bank.additional.full %>% filter (y=='yes')
 
  # Picking 1000 sample each from yes and no
-        set.seed(1234)
+        set.seed(123)
         index.no<-sample(1:nrow(bank.additional.no),1000,replace=FALSE)
         index.yes<-sample(1:nrow(bank.additional.yes),1000,replace=FALSE)
 
@@ -59,12 +68,22 @@ library(MASS)
         bank.additional.sample.yes<-bank.additional.yes[index.yes,]
         
         bank.additional.sample <- rbind(bank.additional.sample.no,bank.additional.sample.yes)
+        
+#Splitting train and test data set
+        set.seed(123)
+        index<-sample(1:2000,1500,replace=FALSE)
+        bank.additional.sample <- as.data.frame(bank.additional.sample)
+        bank.additional.sample.train<-bank.additional.sample[index,]
+        bank.additional.sample.train <- as.data.frame(bank.additional.sample.train)
+        bank.additional.sample.test <-bank.additional.sample[-index,]
+        bank.additional.sample.test <- as.data.frame(bank.additional.sample.test)
+
 ```
 
 
 ```{r}
 #summary of dataset
-        summary(bank.additional.full)
+        summary(bank.additional.sample)
 ```
 
 
@@ -83,40 +102,10 @@ library(MASS)
 ```
 
 
-
 ```{r}
-# Education Stacked Bar Plot
-#counts <- table(bank.additional.sample$y, bank.additional.sample$education)
-#barplot(counts, main="Term Deposits by Education",
-#        xlab="Type of Education", col=c("darkblue","red"),
-#        legend = rownames(counts))
-```
-
-
-```{r}
-# Month Stacked Bar Plot
-#counts <- table(bank.additional.sample$y, bank.additional.sample$month)
-#barplot(counts, main="Term Deposits by Month",
-#        xlab="Last Month Contacted", col=c("darkblue","red"),
-#        legend = rownames(counts))
-
-# Day of the Week Contacted Stacked Bar Plot
-#counts <- table(bank.additional.sample$y, bank.additional.sample$day_of_week)
-#barplot(counts, main="Term Deposits by Day of the Week",
-#        xlab="Type of Education", col=c("darkblue","red"),
-#       legend = rownames(counts))
-```
-
-
-```{r}
-#Visualize Categorical predictors
-        set.seed(1234)
-        index<-sample(1:2000,1500,replace=FALSE)
-        test<-bank.additional.sample[-index,]
-        bank.additional.sample<-bank.additional.sample[index,]
-        
+#Visualize Categorical variables
+#Table of counts are helpful for categorical variables
         attach(bank.additional.sample)
-#Table of counts are helpful for categorical predictors
         ftable(addmargins(table(y,job))) 
         ftable(addmargins(table(y,marital)))
         ftable(addmargins(table(y,education))) 
@@ -149,52 +138,96 @@ library(MASS)
         plot(y~day_of_week,col=c("red","blue"))
         prop.table(table(y,poutcome),2)
         plot(y~poutcome,col=c("red","blue"))
-
 ```
 
 
 ```{r}
-#PCA among the continous predictors 
 
-#        pairs(bank.additional.sample[,c(1,11:14,16:19)])
-#        pairs(bank.additional.sample[,c(1,11:14,16:19)],col=bank.additional.sample$y)
-#        my.cor<-cor(bank.additional.sample[,c(1,11:14,16:19)])
-        
-#        heatmap.2(my.cor,col=redgreen(75), 
-#                  density.info="none", trace="none", dendrogram=c("both"), 
-#                  symm=F,symkey=T,symbreaks=T, scale="none",key=T)
-        
-        
-#        pc.result<-prcomp(bank.additional.sample[,c(1,11:14,16:19)],scale.=TRUE)
-#        pc.scores<-pc.result$x
-#        pc.scores<-data.frame(pc.scores)
-#        pc.scores$y<-bank.additional.sample$y
-        
-        
-#        eigenvals<-(pc.result$sdev)^2
-#        plot(1:9,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
-#        cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-#        lines(1:9,cumulative.prop,lty=2)
+#Logistics Regression Assumption Check
 
+#Overall EDA to check collinearity between continous variables
+        #ggpairs(bank.additional.full,columns=c(1,11:14,16:20),aes(colour=y))
+        ggpairs(bank.additional.sample,columns=c(1,11:14,16:20),aes(colour=y))
 ```
 
 
 ```{r}
-#fitting a simple model by using only 3 predictors which appered to be significant in EDA
+#fitting a simple model by using only 5 predictors which appeared to be significant in EDA (Suchi)
         simple.logistics<-glm(y~emp.var.rate + euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample)
         summary(simple.logistics)
+        confint(simple.logistics)
 ```
 
 
 ```{r}
-#fitting a complex model by using all variables
+#fitting a simple model by using only 4 predictors which appeared to be significant in EDA and p-values (Hollie)
+        simple.logistics<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics)
+        confint(simple.logistics)
+```
+
+
+```{r}
+# Kenny
+        simple.logistics.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        fit.simple.logistics.pred<-predict(simple.logistics.trained, newdata = bank.additional.sample.test, type = "response")
+        
+        cutoff<-0.5
+        class.simple.logistics<-factor(ifelse(fit.simple.logistics.pred>cutoff,"yes","no"),levels=c("no","yes"))
+
+#      conf.simple.logistics<-table(class.simple.logistics,bank.additional.sample.test$y)
+        conf.simple.logistics<-confusionMatrix(table(class.simple.logistics,bank.additional.sample.test$y),positive = 'yes')
+        conf.simple.logistics
+#      mean(class.simple.logistics==bank.additional.sample.test$y)
+      
+        results.simple.logistics<-prediction(fit.simple.logistics.pred,bank.additional.sample.test$y,label.ordering=c("no","yes"))
+        roc.simple.logistics = performance(results.simple.logistics, measure = "tpr", x.measure = "fpr")
+        plot(roc.simple.logistics,colorize = TRUE)
+        abline(a=0, b= 1)
+```
+
+
+```{r}
+#Fitting a complex model using 4 variables and 1 interaction (Kenny)
+        complex.interaction<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx + cons.price.idx*cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        summary(complex.interaction)
+        confint(complex.interaction)
+```
+
+
+```{r}
+#(Kenny)
+        complex.interaction.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx + cons.price.idx*cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        fit.complex.interaction.pred<-predict(complex.interaction.trained, newdata = bank.additional.sample.test, type = "response")
+        
+        cutoff<-0.5
+        class.complex.interaction<-factor(ifelse(fit.complex.interaction.pred>cutoff,"yes","no"),levels=c("no","yes"))
+  
+  #      conf.complex.interaction<-table(class.complex.interaction,bank.additional.sample.test$y)
+        conf.complex.interaction<-confusionMatrix(table(class.complex.interaction,bank.additional.sample.test$y), positive = 'yes')
+        conf.complex.interaction
+  #      mean(class.complex.interaction==bank.additional.sample.test$y)
+        
+        results.complex.interaction<-prediction(fit.complex.interaction.pred,bank.additional.sample.test$y,label.ordering=c("no","yes"))
+        roc.complex.interaction = performance(results.complex.interaction, measure = "tpr", x.measure = "fpr")
+        plot(roc.complex.interaction,col = "blue")
+        plot(roc.simple.logistics,col = "red",add=TRUE)
+        legend("bottomright",legend=c("Simple","Added Interaction"),col=c("blue","red"),lty=1,lwd=1)
+        abline(a=0, b= 1)
+
+```
+
+
+```{r}
+#fitting a complex model by using all variables just to check the behaviour
         simple.log<-glm(y~.,family="binomial",data=bank.additional.sample)
         summary(simple.log)
+        confint(simple.log)
 ```
 
 
 ```{r}
-#fitting a complex model by using all variables and using stepwise selection
+#fitting a complex model by using all variables and using stepwise selection (Suchi)
         full.log<-glm(y~.,family="binomial",data=bank.additional.sample)
         step.log<-full.log %>% stepAIC(trace=FALSE)
         summary(step.log)
@@ -202,17 +235,94 @@ library(MASS)
 ```
 
 
+```{r}
+#Objective 2 (Point 3) -- LDA on Sample data (Suchi: Objective 2: Point 3)
+        bank.additional.lda <- lda(y ~ ., bank.additional.sample.train[c(1,11:14,16:21)])
+        bank.additional.lda.p <- predict(bank.additional.lda, bank.additional.sample.test)$class
+        table.lda <- table(bank.additional.lda.p, bank.additional.sample.test$y)
+        cm.lda = confusionMatrix(table.lda, positive = 'yes')
+        cm.lda
+```
+
 
 ```{r}
-#Objective 2 (Point 3) -- LDA on Sample data
-bank.additional.lda <- lda (y ~ ., bank.additional.sample)
-bank.additional.lda.p <- predict(bank.additional.lda, test)$class
-test <- as.data.frame(test)
-table(bank.additional.lda.p, test[,21])
-
-bank.additional.full <- as.data.frame(bank.additional.full)
-bank.additional.lda.cv <- lda (y ~ ., bank.additional.full, CV=TRUE)
-table(bank.additional.lda.cv$class, bank.additional.full[,21])
+#Random Forest (Suchi: Optional)
+        bank.rf<- randomForest(y~., data = bank.additional.sample.train, importance=TRUE)
+        bank.rf
+        bank.rf.pred<- predict(bank.rf, bank.additional.sample.test)
+##Confusion Matrix
+        table.rf <- table(bank.rf.pred,bank.additional.sample.test$y)
+        cm.rf = confusionMatrix(table.rf, positive = 'yes')
+        cm.rf
+#Misclassification rate
+        1-sum(diag(table.rf))/sum(table.rf)
 ```
+
+
+```{r knn}
+#KNN (Hollie)
+      set.seed(123)
+      splitPerc = .75
+
+#trainIndices = sample(1:dim(bank.additional.sample)[1],round(splitPerc * dim(bank.additional.sample)[1]))
+#train = bank.additional.sample[trainIndices,]
+#test = bank.additional.sample[-trainIndices,]
+
+# k = 32
+      classifications = knn(bank.additional.sample.train[,c(17,19)],bank.additional.sample.test[,c(17,19)],bank.additional.sample.train$y, prob = TRUE, k = 32)
+      table(bank.additional.sample.test$y,classifications)
+      confusionMatrix(table(bank.additional.sample.test$y,classifications))
+      
+      CM = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
+      CM$overall[1]
+  
+    ## Loop for many k and one training / test partition
+  
+      accs = data.frame(accuracy = numeric(50), k = numeric(50))
+  
+      for(i in 1:50)
+      {
+        classifications = knn(bank.additional.sample.train[,c(17,19)],bank.additional.sample.test[,c(17,19)],bank.additional.sample.train$y, prob = TRUE, k = i)
+        table(bank.additional.sample.test$y,classifications)
+        CM = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
+        accs$accuracy[i] = CM$overall[1]
+        accs$k[i] = i
+      }
+      
+      plot(accs$k,accs$accuracy, type = "l", xlab = "k")
+```
+
+
+```{r}
+
+#iterations = 500
+      iterations = 60
+      
+      numks = 50
+      
+      masterAcc = matrix(nrow = iterations, ncol = numks)
+      
+      for(j in 1:iterations)
+      {
+        accs = data.frame(accuracy = numeric(50), k = numeric(50))
+        trainIndices = sample(1:dim(bank.additional.sample)[1],round(splitPerc * dim(bank.additional.sample)[1]))
+        train = bank.additional.sample[trainIndices,]
+        test = bank.additional.sample[-trainIndices,]
+        for(i in 1:numks)
+        {
+          classifications = knn(train[,c(17,19)],test[,c(17,19)],train$y, prob = TRUE, k = i)
+          table(classifications,test$y)
+          CM = confusionMatrix(table(classifications,test$y))
+          masterAcc[j,i] = CM$overall[1]
+        }
+        
+      }
+      MeanAcc = colMeans(masterAcc)
+      
+      plot(seq(1,numks,1),MeanAcc, type = "l")
+```
+
+
+
 
 
