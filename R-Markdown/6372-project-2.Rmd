@@ -172,8 +172,11 @@ We can see there is no missing data in this dataset.
 ```
 
 
-Drawing corr plot to check collinearity between continous variables. However, for few, was not very clear if there is linear relationship. Putting additional scatter plots for those.
+#####Logistics Regression Assumption Check
 
+- Drawing corr plot to check collinearity between continous variables. We do not see any multicollinearity between continous variables.
+- There is no evidence against independent observation 
+- Response variables are categorical and has two levels
 
 ```{r checking assumption before fitting logistic regression}
 
@@ -181,22 +184,25 @@ Drawing corr plot to check collinearity between continous variables. However, fo
 #Overall EDA to check collinearity between continous variables
 
         ggpairs(bank.additional.full,columns=c(1,11:14,16:20),aes(colour=y))
+
+
+
 #        ggpairs(bank.additional.sample,columns=c(1,11:14,16:20),aes(colour=y))
 
-      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.price.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer price index") +  ggtitle("employment variation rate vs consumer price index")  
-      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.conf.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer confidence index") + ggtitle("employment variation rate vs consumer confidence index")   
-      ggplot(bank.additional.full, aes(x = emp.var.rate , y = nr.employed)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("number of employees")+  ggtitle("employment variation rate vs number of employees")  
+#      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.price.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer price index") +  ggtitle("employment variation rate vs consumer price index")  
+#      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.conf.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer confidence index") + ggtitle("employment variation rate vs consumer confidence index")   
+#      ggplot(bank.additional.full, aes(x = emp.var.rate , y = nr.employed)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("number of employees")+  ggtitle("employment variation rate vs number of employees")  
 
-      ggplot(bank.additional.full, aes(x = cons.price.idx , y = cons.conf.idx)) +  geom_point()  + xlab("consumer price index") + ylab("consumer confidence index") +  ggtitle("Relation between consumer price index and consumer confidence index")  
-      ggplot(bank.additional.full, aes(x = cons.price.idx , y = nr.employed)) +  geom_point()  + xlab("consumer price index") + ylab("number of employees") +  ggtitle("Relation between consumer price index and number of employees")  
+ #     ggplot(bank.additional.full, aes(x = cons.price.idx , y = cons.conf.idx)) +  geom_point()  + xlab("consumer price index") + ylab("consumer confidence index") +  ggtitle("Relation between consumer price index and consumer confidence index")  
+#      ggplot(bank.additional.full, aes(x = cons.price.idx , y = nr.employed)) +  geom_point()  + xlab("consumer price index") + ylab("number of employees") +  ggtitle("Relation between consumer price index and number of employees")  
 
-      ggplot(bank.additional.full, aes(x = cons.conf.idx , y = nr.employed)) +  geom_point()  + xlab("consumer confidence index") + ylab("number of employees") +  ggtitle("Relation between consumer confidence index and number of employees")  
+#      ggplot(bank.additional.full, aes(x = cons.conf.idx , y = nr.employed)) +  geom_point()  + xlab("consumer confidence index") + ylab("number of employees") +  ggtitle("Relation between consumer confidence index and number of employees")  
 
 
 ```
 
 
-#### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals. For simplicity sake, you do not need to include interactions with this model. Comment on the  practical vs statistical significance of the deemed important factors.
+#### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals. Comment on the  practical vs statistical significance of the deemed important factors.
 
 
 ```{r logistic regression on individual predictors, include=FALSE}
