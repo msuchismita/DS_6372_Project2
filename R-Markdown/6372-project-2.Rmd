@@ -9,8 +9,8 @@ output: html_document
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(warning = FALSE)
-#knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+#knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(gplots)
 library(ggplot2)
 library(tidyverse)
@@ -45,18 +45,19 @@ The classification goal is to predict if the client will subscribe (yes/no) a te
         bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
 ```
 
+We can see there is no missing data in this dataset.
 
+`Graph for checking missing data`
 ```{r}
 #Missing data? 
         vis_miss(bank.additional.full)
 ```
 
 
-#### To ensure performance metrics are comparable across models, setting the training and test sets here in the beginning. 
-
 
 ```{r dataset setup}
 ## TRANSFORMING DATA (Suchi)
+#### To ensure performance metrics are comparable across models, setting the training and test sets here in the beginning. 
 
 #Converting the categorical variables as factors
         bank.additional.full$y <- as.factor(bank.additional.full$y)
@@ -100,10 +101,13 @@ The classification goal is to predict if the client will subscribe (yes/no) a te
 ```
 
 
-```{r summary of dataset}
+```{r summary of dataset, include=FALSE}
 #summary of dataset (Hollie)
+        print("Full Dataset Summary")
         summary(bank.additional.full)
+        print("Sample Dataset Summary")
         summary(bank.additional.sample)
+        print("Training Dataset Summary")
         summary(bank.additional.sample.train)
 ```
 
@@ -124,7 +128,7 @@ The classification goal is to predict if the client will subscribe (yes/no) a te
 ```
 
 
-```{r visualizing categorical predictors}
+```{r ftable categorical predictors, include=FALSE}
 #Visualize Categorical variables (Suchi)
 #Table of counts are helpful for categorical variables
         attach(bank.additional.sample)
@@ -138,7 +142,12 @@ The classification goal is to predict if the client will subscribe (yes/no) a te
         ftable(addmargins(table(y,month))) 
         ftable(addmargins(table(y,day_of_week))) 
         ftable(addmargins(table(y,poutcome))) 
+```
 
+
+`All Predictor categorical variables vs Dependent Variable`
+```{r visualizing categorical predictors}
+#Suchi
 #to get proportions that make sense
         prop.table(table(y,job),2)
         plot(y~job,col=c("red","blue"))
@@ -190,7 +199,7 @@ Drawing corr plot to check collinearity between continous variables. However, fo
 #### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals. For simplicity sake, you do not need to include interactions with this model. Comment on the  practical vs statistical significance of the deemed important factors.
 
 
-```{r logistic regression on individual predictors}
+```{r logistic regression on individual predictors, include=FALSE}
 # Checking significance of individual variables in predicting outcome (Suchi)
       summary(glm(y~age , family="binomial",data=bank.additional.sample.train))        ##From boxplot, it did not look significant but from glm, it does look OK.
       summary(glm(y~job , family="binomial",data=bank.additional.sample.train))
@@ -215,7 +224,7 @@ Drawing corr plot to check collinearity between continous variables. However, fo
 ```
 
 
-
+`Type of Selection : (Manual / Intuition)`
 ```{r}
 #Suchi
 #Type of Selection (Manual / Intuition)
@@ -270,16 +279,14 @@ Drawing corr plot to check collinearity between continous variables. However, fo
 
 
 Since our goal is to predict the outcome, removing the `duration` variable from stepwise full model even though it looked significant in the full  model. 
-`default` is considered in stepwise model. However, we do not want to consider it because considering `unknown` status as predictor would be risky. And `defaultno` is not significant.
-Practically I do not believe customer response depends on which month they were contacted (could be just a coincidence). But for now keeping it in the model.
+Practically I do not believe customer response depends on which month or day_of_week they were contacted (could be just a coincidence). But for now keeping it in the model.
 
 Finalizing the below equation as it had lowest AIC among Forward, Backward and Stepwise model. Backward and Stepwise has exactly same set of predictor variables.
 
-`y ~ age + default + contact + month + day_of_week + campaign + pdays + previous + emp.var.rate + cons.price.idx + cons.conf.idx`
+`y ~ housing + contact + month + day_of_week + pdays + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + nr.employed`
 
 
 ```{r}
-
 #Suchi
 #Type of Selection : Stepwise, Forward, Backward
 
@@ -288,19 +295,25 @@ Finalizing the below equation as it had lowest AIC among Forward, Backward and S
         full.log.model<-glm(y~.,family="binomial",data=bank.additional.sample.train[-11])
 
 # Stepwise model
+      print("Stepwise Model Details:")
       step.model <- stepAIC(full.log.model, direction = "both",  trace = FALSE)
       summary(step.model)
+      print("Step Model AIC:" )
       AIC(step.model)
       exp(cbind("Odds ratio" = coef(step.model), confint.default(step.model, level = 0.95)))
       vif(step.model)  
       
 # forward regression model
+      print("Forward Model Details:")
       foward.model <- stepAIC(full.log.model, direction = "forward", trace = FALSE)
+      print("Forward Model AIC:" )
       AIC(foward.model)
       summary(foward.model)
 
 # backward regression model
+      print("Backward Model Details:")
       backward.model <- stepAIC(full.log.model, direction = "backward", trace = FALSE)
+      print("Backward Model AIC:" )
       AIC(backward.model)
       summary(backward.model)
 
@@ -309,7 +322,7 @@ Finalizing the below equation as it had lowest AIC among Forward, Backward and S
 
 
 
-```{r}
+```{r include=FALSE}
 #fitting a simple model by using only 4 predictors which appeared to be significant in EDA and p-values from previous step (Hollie)
         simple.logistics.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
         summary(simple.logistics.trained)
@@ -319,7 +332,7 @@ Finalizing the below equation as it had lowest AIC among Forward, Backward and S
 
 
 
-
+`Performance comparison for simple logistic model`
 ```{r}
 # Performance comparison for simple logistic model (Kenny)
 
@@ -368,7 +381,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 
 
-
+`Confusion matrix for LASSO`
 ```{r}
 #confusion matrix for LASSO (Suchi)
 
@@ -412,7 +425,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 ### Objective 2: You must include one additional logistic regression model which is also a more complicated logistic regression model than in Objective 1.
 
-
+`Fitting a complex model using 4 variables and 1 interaction`
 ```{r}
 #Fitting a complex model using 4 variables and 1 interaction (Kenny)
         complex.interaction<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx + cons.price.idx*cons.conf.idx, family="binomial",data=bank.additional.sample.train)
@@ -434,7 +447,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 ```
 
 
-
+`Performance comparison for simple logistic model + interaction term`
 ```{r}
 # Performance comparison for simple logistic model + interaction term (Kenny)
 
@@ -463,7 +476,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 #### Create another competing model using just the continuous predictors and use LDA or QDA.  
 
-
+`LDA`
 ```{r}
 #Objective 2 (Point 3) -- LDA on Sample data (Suchi: Objective 2: Point 3) # Did not use duration variable
         bank.additional.lda <- lda(y ~ ., bank.additional.sample.train[c(1,10:14,16:21)])
@@ -476,7 +489,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 #### (Optional) Use a nonparameteric model approach as a competing model. Random forest or decision tree for predictors that are both categorical and continuous.
 
-
+`Random Forest`
 ```{r}
 #Random Forest (Suchi: Optional) # Did not use duration variable
         bank.rf<- randomForest(y~., data = bank.additional.sample.train[-11], importance=TRUE)
@@ -495,6 +508,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 After running thru 50 iterations on same sample data set and running thru 100 iteration on different split dataset, we see that at K=32, the model has highest performance.
 
+`KNN`
 ```{r knn}
 #KNN (Hollie)
 set.seed(123)
@@ -556,7 +570,7 @@ cm.knn$overall[1]
 
 #### Provide a summary table of the performance across the competing methods. Summarize the overall findings.
 
-
+`Comparison of models`
 ```{r }
 #Suchi
 #Comparing metrics from all model
@@ -592,8 +606,5 @@ cm.knn$overall[1]
         1-sum(diag(cm.knn$table))/sum(cm.knn$table)
 
 ```
-
-
-
 
 
