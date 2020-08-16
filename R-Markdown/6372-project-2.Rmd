@@ -5,6 +5,9 @@ date: "7/12/2020"
 output: html_document
 ---
 
+# Bank Marketing Data Set 
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE)
 #knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
@@ -12,7 +15,6 @@ library(gplots)
 library(ggplot2)
 library(tidyverse)
 library(naniar)
-library(imputeTS)
 library(plyr)
 library(readr)
 library(dplyr)
@@ -24,10 +26,21 @@ library(e1071)
 library(caret)
 library(class)
 library(ROCR)
+library(car)
+library(glmnet)
 ```
 
 
-```{r}
+## Context
+
+The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') subscribed. 
+The classification goal is to predict if the client will subscribe (yes/no) a term deposit (variable y).
+
+
+### Objective 1: Display the ability to perform EDA and build a logistic regression model
+
+
+```{r Reading datafile}
 # Reading datafile
         bank.additional.full <- read_delim("../Data/bank-additional-full.csv", delim = ";")
 ```
@@ -39,8 +52,11 @@ library(ROCR)
 ```
 
 
-```{r}
-## TRANSFORMING DATA
+#### To ensure performance metrics are comparable across models, setting the training and test sets here in the beginning. 
+
+
+```{r dataset setup}
+## TRANSFORMING DATA (Suchi)
 
 #Converting the categorical variables as factors
         bank.additional.full$y <- as.factor(bank.additional.full$y)
@@ -55,14 +71,17 @@ library(ROCR)
         bank.additional.full$poutcome <- as.factor(bank.additional.full$poutcome)
         bank.additional.full$month <- as.factor(bank.additional.full$month)
 
+#Removing records from bank.additional.full where value of default = 'yes' as it might cause issue when picked in non-balance way.
+        bank.additional.full <- bank.additional.full %>% filter (default!='yes')    
+
 # Separating out yes and no observations
         bank.additional.no <- bank.additional.full %>% filter (y=='no')
         bank.additional.yes <- bank.additional.full %>% filter (y=='yes')
 
  # Picking 1000 sample each from yes and no
-        set.seed(123)
-        index.no<-sample(1:nrow(bank.additional.no),1000,replace=FALSE)
-        index.yes<-sample(1:nrow(bank.additional.yes),1000,replace=FALSE)
+        set.seed(1234)
+        index.no<-sample(1:nrow(bank.additional.no),2000,replace=FALSE)
+        index.yes<-sample(1:nrow(bank.additional.yes),2000,replace=FALSE)
 
         bank.additional.sample.no<-bank.additional.no[index.no,]
         bank.additional.sample.yes<-bank.additional.yes[index.yes,]
@@ -70,8 +89,8 @@ library(ROCR)
         bank.additional.sample <- rbind(bank.additional.sample.no,bank.additional.sample.yes)
         
 #Splitting train and test data set
-        set.seed(123)
-        index<-sample(1:2000,1500,replace=FALSE)
+        set.seed(1234)
+        index<-sample(1:4000,3000,replace=FALSE)
         bank.additional.sample <- as.data.frame(bank.additional.sample)
         bank.additional.sample.train<-bank.additional.sample[index,]
         bank.additional.sample.train <- as.data.frame(bank.additional.sample.train)
@@ -81,14 +100,17 @@ library(ROCR)
 ```
 
 
-```{r}
-#summary of dataset
+```{r summary of dataset}
+#summary of dataset (Hollie)
+        summary(bank.additional.full)
         summary(bank.additional.sample)
+        summary(bank.additional.sample.train)
 ```
 
 
-```{r}
-#boxplot of response variable (y) versus all other continous variables
+
+```{r visualizing relationship between y and continous variables}
+#boxplot of response variable (y) versus all other continous variables (Suchi)
         bank.additional.sample %>% ggplot(aes(x = y, y=age)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by Age") + ylab("Age")
         bank.additional.sample %>% ggplot(aes(x = y, y=duration)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by duration") + ylab("duration")
         bank.additional.sample %>% ggplot(aes(x = y, y=campaign)) + geom_boxplot(fill="red") + labs(title = "Term Deposits Success by campaign") + ylab("campaign")
@@ -102,8 +124,8 @@ library(ROCR)
 ```
 
 
-```{r}
-#Visualize Categorical variables
+```{r visualizing categorical predictors}
+#Visualize Categorical variables (Suchi)
 #Table of counts are helpful for categorical variables
         attach(bank.additional.sample)
         ftable(addmargins(table(y,job))) 
@@ -141,53 +163,254 @@ library(ROCR)
 ```
 
 
-```{r}
+Drawing corr plot to check collinearity between continous variables. However, for few, was not very clear if there is linear relationship. Putting additional scatter plots for those.
 
-#Logistics Regression Assumption Check
 
+```{r checking assumption before fitting logistic regression}
+
+#Logistics Regression Assumption Check (Suchi)
 #Overall EDA to check collinearity between continous variables
-        #ggpairs(bank.additional.full,columns=c(1,11:14,16:20),aes(colour=y))
-        ggpairs(bank.additional.sample,columns=c(1,11:14,16:20),aes(colour=y))
+
+        ggpairs(bank.additional.full,columns=c(1,11:14,16:20),aes(colour=y))
+#        ggpairs(bank.additional.sample,columns=c(1,11:14,16:20),aes(colour=y))
+
+      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.price.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer price index") +  ggtitle("employment variation rate vs consumer price index")  
+      ggplot(bank.additional.full, aes(x = emp.var.rate , y = cons.conf.idx)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("consumer confidence index") + ggtitle("employment variation rate vs consumer confidence index")   
+      ggplot(bank.additional.full, aes(x = emp.var.rate , y = nr.employed)) +  geom_point()  + xlab("employment variation rate - quarterly indicator") + ylab("number of employees")+  ggtitle("employment variation rate vs number of employees")  
+
+      ggplot(bank.additional.full, aes(x = cons.price.idx , y = cons.conf.idx)) +  geom_point()  + xlab("consumer price index") + ylab("consumer confidence index") +  ggtitle("Relation between consumer price index and consumer confidence index")  
+      ggplot(bank.additional.full, aes(x = cons.price.idx , y = nr.employed)) +  geom_point()  + xlab("consumer price index") + ylab("number of employees") +  ggtitle("Relation between consumer price index and number of employees")  
+
+      ggplot(bank.additional.full, aes(x = cons.conf.idx , y = nr.employed)) +  geom_point()  + xlab("consumer confidence index") + ylab("number of employees") +  ggtitle("Relation between consumer confidence index and number of employees")  
+
+
+```
+
+
+#### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals. For simplicity sake, you do not need to include interactions with this model. Comment on the  practical vs statistical significance of the deemed important factors.
+
+
+```{r logistic regression on individual predictors}
+# Checking significance of individual variables in predicting outcome (Suchi)
+      summary(glm(y~age , family="binomial",data=bank.additional.sample.train))        ##From boxplot, it did not look significant but from glm, it does look OK.
+      summary(glm(y~job , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~marital , family="binomial",data=bank.additional.sample.train))    ## Not at all
+      summary(glm(y~education , family="binomial",data=bank.additional.sample.train))  ## Meh
+      summary(glm(y~default , family="binomial",data=bank.additional.sample.train))    ## Okay, will get back to you!!!!
+      summary(glm(y~housing , family="binomial",data=bank.additional.sample.train))    ## Not at all
+      summary(glm(y~loan , family="binomial",data=bank.additional.sample.train))       ## Not at all
+      summary(glm(y~contact , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~month , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~day_of_week , family="binomial",data=bank.additional.sample.train))## Not at all
+      summary(glm(y~duration , family="binomial",data=bank.additional.sample.train))   ## This is not a true predictor
+      summary(glm(y~campaign , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~pdays , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~previous , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~poutcome , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~emp.var.rate , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~cons.price.idx , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~cons.conf.idx , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~euribor3m , family="binomial",data=bank.additional.sample.train))
+      summary(glm(y~nr.employed , family="binomial",data=bank.additional.sample.train))
 ```
 
 
 
 ```{r}
+#Suchi
+#Type of Selection (Manual / Intuition)
+#fitting a simple model by using only those predictors which appeared to be significant in EDA and individual variable check -- ##Kind of Manual backward selection
+  
+        simple.logistics.all.significant<-glm(y~ job + contact + month + campaign + pdays + previous + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all.significant)
+        #confint(simple.logistics.all.significant)
 
-#fitting a simple model by using only 5 predictors which appeared to be significant in EDA (Suchi)
-        simple.logistics<-glm(y~emp.var.rate + euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample)
-        summary(simple.logistics)
-        confint(simple.logistics)
-```
-
-
-
-```{r}
-#fitting a simple model by using only 4 predictors which appeared to be significant in EDA and p-values (Hollie)
-        simple.logistics<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
-        summary(simple.logistics)
-        confint(simple.logistics)
-```
-
-
-```{r}
-# Kenny
-        simple.logistics.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
-        fit.simple.logistics.pred<-predict(simple.logistics.trained, newdata = bank.additional.sample.test, type = "response")
         
+#Removing job variable as it does not look statistically significant in model (Got lowest AIC 3270 here)
+        simple.logistics.all1 <-glm(y~ contact + month + campaign + pdays + previous + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all1)
+        #confint(simple.logistics.all1)
+
+
+#Removing month variable as it does not look practically significant 
+        simple.logistics.all2 <-glm(y~ contact + campaign + pdays + previous + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all2)
+        #confint(simple.logistics.all2)
+
+        
+#Removing campaign variable as it does not look statistically significant in model
+        simple.logistics.all3 <-glm(y~ contact +  pdays + previous + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all3)
+        #confint(simple.logistics.all3)
+
+        
+#Removing pdays variable as it does not look statistically significant in model
+        simple.logistics.all4 <-glm(y~ contact + previous + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all4)
+        #confint(simple.logistics.all4)
+
+        
+#Removing previous variable as it does not look statistically significant in model
+        simple.logistics.all5 <-glm(y~ contact + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m + nr.employed, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all5)
+        #confint(simple.logistics.all5)
+
+        
+#Removing nr.employed variable as it does not look statistically significant in model and it looked like related to emp.var.rate
+        simple.logistics.all6 <-glm(y~ contact + poutcome + emp.var.rate + cons.price.idx + cons.conf.idx + euribor3m, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.all6)
+        #confint(simple.logistics.all6)
+
+        
+#Removing euribor3m variable as it does not look statistically significant in model and it looked like related to emp.var.rate 
+        simple.logistics<-glm(y~ contact + poutcome + emp.var.rate + cons.conf.idx + cons.price.idx , family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics)
+        confint(simple.logistics)
+```
+
+
+Since our goal is to predict the outcome, removing the `duration` variable from stepwise full model even though it looked significant in the full  model. 
+`default` is considered in stepwise model. However, we do not want to consider it because considering `unknown` status as predictor would be risky. And `defaultno` is not significant.
+Practically I do not believe customer response depends on which month they were contacted (could be just a coincidence). But for now keeping it in the model.
+
+Finalizing the below equation as it had lowest AIC among Forward, Backward and Stepwise model. Backward and Stepwise has exactly same set of predictor variables.
+
+`y ~ age + default + contact + month + day_of_week + campaign + pdays + previous + emp.var.rate + cons.price.idx + cons.conf.idx`
+
+
+```{r}
+
+#Suchi
+#Type of Selection : Stepwise, Forward, Backward
+
+
+# First Fit the full model (Excluding duration variable)
+        full.log.model<-glm(y~.,family="binomial",data=bank.additional.sample.train[-11])
+
+# Stepwise model
+      step.model <- stepAIC(full.log.model, direction = "both",  trace = FALSE)
+      summary(step.model)
+      AIC(step.model)
+      exp(cbind("Odds ratio" = coef(step.model), confint.default(step.model, level = 0.95)))
+      vif(step.model)  
+      
+# forward regression model
+      foward.model <- stepAIC(full.log.model, direction = "forward", trace = FALSE)
+      AIC(foward.model)
+      summary(foward.model)
+
+# backward regression model
+      backward.model <- stepAIC(full.log.model, direction = "backward", trace = FALSE)
+      AIC(backward.model)
+      summary(backward.model)
+
+```
+
+
+
+
+```{r}
+#fitting a simple model by using only 4 predictors which appeared to be significant in EDA and p-values from previous step (Hollie)
+        simple.logistics.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        summary(simple.logistics.trained)
+        confint(simple.logistics.trained)      
+        
+```
+
+
+
+
+```{r}
+# Performance comparison for simple logistic model (Kenny)
+
+        #simple.logistics.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx, family="binomial",data=bank.additional.sample.train)
+        fit.simple.logistics.pred<-predict(step.model, newdata = bank.additional.sample.test, type = "response")
+ 
         cutoff<-0.5
         class.simple.logistics<-factor(ifelse(fit.simple.logistics.pred>cutoff,"yes","no"),levels=c("no","yes"))
 
-#      conf.simple.logistics<-table(class.simple.logistics,bank.additional.sample.test$y)
-        conf.simple.logistics<-confusionMatrix(table(class.simple.logistics,bank.additional.sample.test$y),positive = 'yes')
+        conf.simple.logistics<-confusionMatrix(table(class.simple.logistics,bank.additional.sample.test$y), positive = 'yes')
         conf.simple.logistics
-#      mean(class.simple.logistics==bank.additional.sample.test$y)
-      
+
         results.simple.logistics<-prediction(fit.simple.logistics.pred,bank.additional.sample.test$y,label.ordering=c("no","yes"))
-        roc.simple.logistics = performance(results.simple.logistics, measure = "tpr", x.measure = "fpr")
+        roc.simple.logistics <- performance(results.simple.logistics, measure = "tpr", x.measure = "fpr")
         plot(roc.simple.logistics,colorize = TRUE)
+        abline(a=0, b=1)
+```
+
+
+
+Removing duration variable here before trying LASSO to compare the performance with stepwise
+```{r}
+# LASSO (Suchi)
+        dat.train.x <- model.matrix(y ~ .,bank.additional.sample.train[-11])
+        dat.train.y<-bank.additional.sample.train[,21]
+        cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+        plot(cvfit)
+        coef(cvfit, s = "lambda.min")
+
+        print("CV Error Rate:")
+        cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+
+#Optimal penalty
+        print("Penalty Value:")
+        cvfit$lambda.min
+
+#For final model predictions go ahead and refit lasso using entire
+#data set
+        lasso.log.final<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
+
+        dat.test.x<-model.matrix(y ~ .,bank.additional.sample.test[-11])
+        fit.pred.lasso <- predict(lasso.log.final, newx = dat.test.x, type = "response")
+        fit.pred.step<-predict(step.model,newdata=bank.additional.sample.test,type="response")
+
+```
+
+
+
+
+```{r}
+#confusion matrix for LASSO (Suchi)
+
+#Using cutoff of 0.5 to make the classification.
+        cutoff<-0.5
+        class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+        class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
+
+#Confusion Matrix for Lasso
+        conf.lasso<-table(class.lasso,bank.additional.sample.test$y)
+        print("Confusion matrix for LASSO")
+        conf.lasso
+        
+        conf.step<-table(class.step,bank.additional.sample.test$y)
+        print("Confusion matrix for Stepwise")
+        conf.step
+```
+
+
+
+```{r}
+#Overall Accuracy of LASSO and Stepwise
+        print("Overall accuracy for LASSO and Stepwise respectively")
+        sum(diag(conf.lasso))/sum(conf.lasso)
+        sum(diag(conf.step))/sum(conf.step)
+```
+
+
+
+
+```{r}
+# ROC plot for LASSO (Suchi)
+        results.lasso<-prediction(fit.pred.lasso, bank.additional.sample.test$y,label.ordering=c("no","yes"))
+        roc.lasso <- performance(results.lasso, measure = "tpr", x.measure = "fpr")
+        plot(roc.lasso,colorize = TRUE)
         abline(a=0, b= 1)
 ```
+
+
+
+
+### Objective 2: You must include one additional logistic regression model which is also a more complicated logistic regression model than in Objective 1.
 
 
 ```{r}
@@ -198,8 +421,23 @@ library(ROCR)
 ```
 
 
+
 ```{r}
-#(Kenny)
+#Fitting a complex model adding 1 new variable by categorizing euribor3m (Suchi)
+
+#        bank.additional.sample.train$euribor3m_updated <- factor(ifelse(bank.additional.sample.train$euribor3m>median(bank.additional.sample.train$euribor3m),"High","Low"),levels=c("Low","High"))
+ #       summary(glm(y~euribor3m_updated , family="binomial",data=bank.additional.sample.train))
+
+ #       complex.logistics.grouping<-glm(y~ euribor3m_updated + age + contact + month + day_of_week + campaign + pdays + previous + emp.var.rate + cons.price.idx + cons.conf.idx , family="binomial",data=bank.additional.sample.train)
+#        summary(complex.logistics.grouping)
+#        confint(complex.logistics.grouping)
+```
+
+
+
+```{r}
+# Performance comparison for simple logistic model + interaction term (Kenny)
+
         complex.interaction.trained<-glm(y~ euribor3m + cons.price.idx + poutcome + cons.conf.idx + cons.price.idx*cons.conf.idx, family="binomial",data=bank.additional.sample.train)
         fit.complex.interaction.pred<-predict(complex.interaction.trained, newdata = bank.additional.sample.test, type = "response")
         
@@ -215,32 +453,20 @@ library(ROCR)
         roc.complex.interaction = performance(results.complex.interaction, measure = "tpr", x.measure = "fpr")
         plot(roc.complex.interaction,col = "blue")
         plot(roc.simple.logistics,col = "red",add=TRUE)
-        legend("bottomright",legend=c("Simple","Added Interaction"),col=c("blue","red"),lty=1,lwd=1)
-        abline(a=0, b= 1)
+        plot(roc.lasso,col = "green",add=TRUE)
+
+        legend("bottomright",legend=c("Simple","Added Interaction", "LASSO"),col=c("blue","red","green"),lty=1,lwd=1)
+        abline(a=0, b=1)
 
 ```
 
 
-```{r}
-#fitting a complex model by using all variables just to check the behaviour
-        simple.log<-glm(y~.,family="binomial",data=bank.additional.sample)
-        summary(simple.log)
-        confint(simple.log)
-```
+#### Create another competing model using just the continuous predictors and use LDA or QDA.  
 
 
 ```{r}
-#fitting a complex model by using all variables and using stepwise selection (Suchi)
-        full.log<-glm(y~.,family="binomial",data=bank.additional.sample)
-        step.log<-full.log %>% stepAIC(trace=FALSE)
-        summary(step.log)
-        exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-```
-
-
-```{r}
-#Objective 2 (Point 3) -- LDA on Sample data (Suchi: Objective 2: Point 3)
-        bank.additional.lda <- lda(y ~ ., bank.additional.sample.train[c(1,11:14,16:21)])
+#Objective 2 (Point 3) -- LDA on Sample data (Suchi: Objective 2: Point 3) # Did not use duration variable
+        bank.additional.lda <- lda(y ~ ., bank.additional.sample.train[c(1,10:14,16:21)])
         bank.additional.lda.p <- predict(bank.additional.lda, bank.additional.sample.test)$class
         table.lda <- table(bank.additional.lda.p, bank.additional.sample.test$y)
         cm.lda = confusionMatrix(table.lda, positive = 'yes')
@@ -248,62 +474,32 @@ library(ROCR)
 ```
 
 
+#### (Optional) Use a nonparameteric model approach as a competing model. Random forest or decision tree for predictors that are both categorical and continuous.
+
+
 ```{r}
-#Random Forest (Suchi: Optional)
-        bank.rf<- randomForest(y~., data = bank.additional.sample.train, importance=TRUE)
+#Random Forest (Suchi: Optional) # Did not use duration variable
+        bank.rf<- randomForest(y~., data = bank.additional.sample.train[-11], importance=TRUE)
         bank.rf
+        varImpPlot(bank.rf)
+        plot(bank.rf)
         bank.rf.pred<- predict(bank.rf, bank.additional.sample.test)
 ##Confusion Matrix
         table.rf <- table(bank.rf.pred,bank.additional.sample.test$y)
         cm.rf = confusionMatrix(table.rf, positive = 'yes')
         cm.rf
-#Misclassification rate
-        1-sum(diag(table.rf))/sum(table.rf)
 ```
 
 
+#### (Optional) Use a nonparameteric model approach as a competing model. k-nearest neighbors approach if just working with continuous predictors. 
+
+After running thru 50 iterations on same sample data set and running thru 100 iteration on different split dataset, we see that at K=32, the model has highest performance.
+
 ```{r knn}
-#Cross Validation (Hollie)
+#KNN (Hollie)
 set.seed(123)
 splitPerc = .75
 
-#trainIndices = sample(1:dim(bank.additional.sample)[1],round(splitPerc * dim(bank.additional.sample)[1]))
-#train = bank.additional.sample[trainIndices,]
-#test = bank.additional.sample[-trainIndices,]
-
-# k = 32
-classifications = knn(bank.additional.sample.train[,c(17,19)],bank.additional.sample.test[,c(17,19)],bank.additional.sample.train$y, prob = TRUE, k = 32)
-table(bank.additional.sample.test$y,classifications)
-confusionMatrix(table(bank.additional.sample.test$y,classifications))
-
-CM = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
-CM$overall[1]
-
-
-## Loop for many k and one training / test partition
-
-accs = data.frame(accuracy = numeric(50), k = numeric(50))
-
-for(i in 1:50)
-{
-  classifications = knn(bank.additional.sample.train[,c(17,19)],bank.additional.sample.test[,c(17,19)],bank.additional.sample.train$y, prob = TRUE, k = i)
-  table(bank.additional.sample.test$y,classifications)
-  CM = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
-  accs$accuracy[i] = CM$overall[1]
-  accs$k[i] = i
-}
-
-plot(accs$k,accs$accuracy, type = "l", xlab = "k")
-
-
-```
-
-
-
-
-```{r }
-
-#iterations = 500
 iterations = 100
 
 numks = 50
@@ -328,6 +524,73 @@ for(j in 1:iterations)
 MeanAcc = colMeans(masterAcc)
 
 plot(seq(1,numks,1),MeanAcc, type = "l")
+
+
+## Loop for many k and one training / test partition
+
+accs = data.frame(accuracy = numeric(50), k = numeric(50))
+
+for(i in 1:50)
+{
+  classifications = knn(bank.additional.sample.train[,c(17,19)],bank.additional.sample.test[,c(17,19)],bank.additional.sample.train$y, prob = TRUE, k = i)
+  table(bank.additional.sample.test$y,classifications)
+  CM = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
+  accs$accuracy[i] = CM$overall[1]
+  accs$k[i] = i
+}
+
+plot(accs$k,accs$accuracy, type = "l", xlab = "k")
+
+
+# k = 10 (optimal that we found)
+classifications = knn(bank.additional.sample.train[,c(17,20)],bank.additional.sample.test[,c(17,20)],bank.additional.sample.train$y, prob = TRUE, k = 10)
+table(bank.additional.sample.test$y,classifications)
+confusionMatrix(table(bank.additional.sample.test$y,classifications) ,positive = 'yes')
+
+cm.knn = confusionMatrix(table(bank.additional.sample.test$y,classifications),positive = 'yes')
+cm.knn$overall[1]
+
+```
+
+
+
+#### Provide a summary table of the performance across the competing methods. Summarize the overall findings.
+
+
+```{r }
+#Suchi
+#Comparing metrics from all model
+
+        print("Simple model Overall Accuracy:")
+        conf.simple.logistics$overall[1]
+        
+        print("Complex model Overall Accuracy:")
+        conf.complex.interaction$overall[1]
+
+        print("Random Forest Overall Accuracy:")
+        cm.rf$overall[1]
+               
+        print("LDA Overall Accuracy:")
+        cm.lda$overall[1]
+                
+        print("KNN Overall Accuracy:")
+        cm.knn$overall[1]
+
+        print("Simple model Misclassification rate:")
+        1-sum(diag(conf.simple.logistics$table))/sum(conf.simple.logistics$table)
+
+        print("Complex model Misclassification rate:")
+        1-sum(diag(conf.complex.interaction$table))/sum(conf.complex.interaction$table)
+        
+        print("RandomForest Misclassification rate:")
+        1-sum(diag(cm.rf$table))/sum(cm.rf$table)
+               
+        print("LDA Misclassification rate:")
+        1-sum(diag(cm.lda$table))/sum(cm.lda$table)
+                
+        print("KNN Misclassification rate:")
+        1-sum(diag(cm.knn$table))/sum(cm.knn$table)
+
 ```
 
 
