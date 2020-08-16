@@ -72,7 +72,7 @@ We can see there is no missing data in this dataset.
         bank.additional.full$poutcome <- as.factor(bank.additional.full$poutcome)
         bank.additional.full$month <- as.factor(bank.additional.full$month)
 
-#Removing records from bank.additional.full where value of default = 'yes' as it might cause issue when picked in non-balance way.
+#Removing records from bank.additional.full where value of default = 'yes' as it might cause issue when picked in non-balanced way.
         bank.additional.full <- bank.additional.full %>% filter (default!='yes')    
 
 # Separating out yes and no observations
@@ -202,8 +202,7 @@ We can see there is no missing data in this dataset.
 ```
 
 
-#### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals. Comment on the  practical vs statistical significance of the deemed important factors.
-
+#### Perform your logistic regression analysis and provide interpretation of the regression coefficients including hypothesis testing, and confidence intervals.
 
 ```{r logistic regression on individual predictors, include=FALSE}
 # Checking significance of individual variables in predicting outcome (Suchi)
@@ -399,11 +398,13 @@ Removing duration variable here before trying LASSO to compare the performance w
 #Confusion Matrix for Lasso
         conf.lasso<-table(class.lasso,bank.additional.sample.test$y)
         print("Confusion matrix for LASSO")
-        conf.lasso
+        cm.conf.lasso<-confusionMatrix(table(class.lasso,bank.additional.sample.test$y), positive = 'yes')
+        cm.conf.lasso
         
         conf.step<-table(class.step,bank.additional.sample.test$y)
         print("Confusion matrix for Stepwise")
-        conf.step
+        cm.conf.step<-confusionMatrix(table(class.step,bank.additional.sample.test$y), positive = 'yes')
+        cm.conf.step
 ```
 
 
@@ -512,7 +513,7 @@ Removing duration variable here before trying LASSO to compare the performance w
 
 #### (Optional) Use a nonparameteric model approach as a competing model. k-nearest neighbors approach if just working with continuous predictors. 
 
-After running thru 50 iterations on same sample data set and running thru 100 iteration on different split dataset, we see that at K=32, the model has highest performance.
+After running thru 50 iterations on same sample data set and running thru 100 iteration on different split dataset, we see that at K=10, the model has highest performance.
 
 `KNN`
 ```{r knn}
